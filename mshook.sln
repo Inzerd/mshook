@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.26430.16
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34330.188
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mshook", "mshook\mshook.csproj", "{ED0EB5BA-95F7-4E8E-8586-938C1D7C2BC4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "msreceiver", "msreceiver\msreceiver.csproj", "{ED8FE769-6171-4F99-9011-E779A3DED5C0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,8 +17,15 @@ Global
 		{ED0EB5BA-95F7-4E8E-8586-938C1D7C2BC4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ED0EB5BA-95F7-4E8E-8586-938C1D7C2BC4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{ED0EB5BA-95F7-4E8E-8586-938C1D7C2BC4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ED8FE769-6171-4F99-9011-E779A3DED5C0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ED8FE769-6171-4F99-9011-E779A3DED5C0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ED8FE769-6171-4F99-9011-E779A3DED5C0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ED8FE769-6171-4F99-9011-E779A3DED5C0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3F4C8022-9CAB-4489-A8C3-85966FA19C4E}
 	EndGlobalSection
 EndGlobal

