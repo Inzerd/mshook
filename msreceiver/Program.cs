@@ -21,9 +21,13 @@ namespace msreceiver
 				{
 					try
 					{
+						
 						var byteReceviver = socket.Receive(buffer);
+						Console.WriteLine($"-- START TRAMISSION {DateTime.Now} --");
 						var data = Encoding.UTF8.GetString(buffer, 0, byteReceviver);						
 						Console.WriteLine(data);
+						Console.WriteLine("-- END Trasmission -- \r\n");
+						
 					}
 					catch (Exception ex) { Console.WriteLine(ex.ToString()); }					
 				}
