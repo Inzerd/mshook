@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -20,14 +21,11 @@ namespace msreceiver
 				while (true)
 				{
 					try
-					{
-						
+					{						
 						var byteReceviver = socket.Receive(buffer);
 						Console.WriteLine($"-- START TRAMISSION {DateTime.Now} --");
-						var data = Encoding.UTF8.GetString(buffer, 0, byteReceviver);						
-						Console.WriteLine(data);
-						Console.WriteLine("-- END Trasmission -- \r\n");
-						
+						Console.WriteLine($"Log entire buffer: {Encoding.UTF8.GetString(buffer, 0, buffer.Length)}");
+						Console.WriteLine("-- END Trasmission -- \r\n");						
 					}
 					catch (Exception ex) { Console.WriteLine(ex.ToString()); }					
 				}

@@ -1,10 +1,9 @@
-################################################################################
-# Il file gitignore è stato creato automaticamente da Microsoft(R) Visual Studio.
-################################################################################
-
 /.vs
 /mshook/bin/Debug
 /mshook/obj/Debug
 /msreceiver/bin/Debug
 /msreceiver/obj/Debug
-/mshook/InterceptKeys.cs
+/mshook/bin/Release
+/mshook/obj/Release
+/msreceiver/bin/Release
+/msreceiver/obj/Release
