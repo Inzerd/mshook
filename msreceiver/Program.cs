@@ -17,14 +17,14 @@ namespace msreceiver
 			using(var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp)) 
 			{ 
 				socket.Bind(new IPEndPoint(IPAddress.Any, port));
-				var buffer = new byte[1024];
+				var buffer = new byte[2048];
 				while (true)
 				{
 					try
 					{						
 						var byteReceviver = socket.Receive(buffer);
 						Console.WriteLine($"-- START TRAMISSION {DateTime.Now} --");
-						Console.WriteLine($"Log entire buffer: {Encoding.UTF8.GetString(buffer, 0, buffer.Length)}");
+						Console.WriteLine($"Log buffer: {Encoding.UTF8.GetString(buffer, 0, buffer.Length)}");
 						Console.WriteLine("-- END Trasmission -- \r\n");						
 					}
 					catch (Exception ex) { Console.WriteLine(ex.ToString()); }					

